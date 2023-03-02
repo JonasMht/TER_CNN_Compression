@@ -420,11 +420,11 @@ class StudentNetworkSmall(nn.Module):
 
 
 class GenericNetwork(nn.Module):
-    def __init__(self, first_layer_size, second_layer_size):
+    def __init__(self, first_layer_size):
         super(GenericNetwork, self).__init__()
         
         self.fc1 = nn.Linear(28 * 28, first_layer_size)
-        self.fc2 = nn.Linear(30, second_layer_size)
+        self.fc2 = nn.Linear(first_layer_size, 10)
         self.dropout_input = 0.0
         self.dropout_hidden = 0.0
         self.is_training = True
