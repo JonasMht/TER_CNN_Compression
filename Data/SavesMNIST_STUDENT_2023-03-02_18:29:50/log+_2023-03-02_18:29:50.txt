@@ -1,5 +1,0 @@
-dataset_folder :xxx
-batch_size=10
-learning_rate_net=1e-05
-num_epoch=10
-nc=3
