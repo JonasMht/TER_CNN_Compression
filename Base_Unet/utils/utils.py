@@ -108,12 +108,18 @@ def multiclass_dice_coeff(input: Tensor, target: Tensor, reduce_batch_first: boo
     return dice / input.shape[1]
 
 
-def dice_loss(input: Tensor, target: Tensor, multiclass: bool = False):
+def dice_loss_old(input: Tensor, target: Tensor, multiclass: bool = False):
     # Dice loss (objective to minimize) between 0 and 1
     assert input.size() == target.size()
     fn = multiclass_dice_coeff if multiclass else dice_coeff
     return 1 - fn(input, target, reduce_batch_first=True)
 
+def dice_loss(output, gt, smooth = 1):
+    output = output.clamp(min = 0, max = 1)
+    intersection = torch.sum(gt*output)
+    union = torch.sum(gt) + torch.sum(output)
+    dice = 1 -((2*intersection+smooth) / (union + smooth))
+    return dice
 
 def smooth(scalars, weight) :  # Weight between 0 and 1
     last = scalars[0]  # First value in the plot (first timestep)

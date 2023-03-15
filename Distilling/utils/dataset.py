@@ -40,6 +40,14 @@ class SegmentationDataSet(data.Dataset):
         img_np = img_np/255  # NORMALIZATION
         label_np = label_np/255  # Should we normalize the mask ?
 
+        # If a pixel of label is 1 then it is of class 1 else it is of class 0
+        label_np[0] = np.where(label_np[0] == 1, 1, 0)
+        label_np[1] = np.where(label_np[1] == 0, 1, 0)
+
+        # Remove useless last dimension (not colors but classes now)
+        label_np = np.delete(label_np, 2, 0)
+
+
         img_tensor = torch.as_tensor(img_np.copy()).float().contiguous()
         label_tensor = torch.as_tensor(label_np.copy()).float().contiguous()
 
@@ -55,10 +63,8 @@ class SegmentationDataSet(data.Dataset):
         # print("size image :", np.shape(img_np))
         # print("size label :", np.shape(label_np))
 
-        return {
-            'image': img_tensor,
-            'mask': label_tensor
-        }
+        return [img_tensor,
+            label_tensor]
 
 
 class SegmentationMixDataSet(data.Dataset):
