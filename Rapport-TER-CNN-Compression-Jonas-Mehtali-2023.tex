@@ -1,0 +1,563 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+
+% For hyperlinks
+\usepackage{hyperref}
+
+% For color
+\usepackage{xcolor}
+
+% Include pdfs
+\usepackage{pdfpages}
+
+% For figures
+\usepackage{geometry}
+\usepackage{graphicx}
+
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\title{Travail d'Etude et de Recherche \\
+\LARGE{Compression de réseau de neurones convolutifs dans le cadre de la segmentation d’images biomédicales} \\
+}
+\author{Jonas MEHTALI}
+\date{\today{}}
+
+% Logos
+\makeatletter         
+\def\@maketitle{
+\raggedright
+\centering
+\includegraphics[width = 40mm]{Resources/Logos/Faculte_Mathematique_Etroit_Logo.png}
+\hspace{4.4cm}
+\includegraphics[width = 40mm]{Resources/Logos/School of Computer Engineering Oviedo.png}
+\\
+[8ex]
+
+\begin{center}
+{\Huge \textsc\@title }\\[4ex] 
+{\LARGE\@author}\\[4ex] 
+{\Large\@date}\\[14ex] 
+\textbf{Travail d'étude et de recherche réalisé à :}\\
+The Department of Computing - Université de Strasbourg\\
+\vspace{0.5cm}
+\textbf{Tutoré par :}\\
+[Etienne Baudrier](https://images.icube.unistra.fr/index.php/Etienne_Baudrier)\\
+Benoît Naegel\\
+Alexandre Stenger\\
+\vspace{0.5cm}
+\textbf{Dates :}\\
+30 May to 30 July 2022\\
+
+\end{center}}
+\makeatother
+
+
+\begin{document}
+
+\maketitle
+
+\newpage
+
+% Automatically generate the table of contents
+\tableofcontents
+
+\newpage
+
+\section{Thanks}
+First, I would like to thank Daniel Fernández Lanvin, Bernardo Martin Gonzalez Rodriguez and Javier De Andrés for having organized this internship and having given great courses that will help me in my future career path.
+\\
+Special thanks to the head of the department of computing, Fernando Álvarez García, for having greenlit this second edition of the IT Research Camp.
+\\
+I would also like to thank my coworker on this project, Sara, for her wonderful work and professionalism.
+\\
+Finally, I'd also like to thank the Erasmus+ program for having provided vital funding for this internship.
+
+\newpage
+\section{Introduction}
+
+ 
+As part of my end of bachelors IT research internship, I present to you this in depth report about my 2 month stay in the city of Oviedo, capital of Asturias, Spain.
+It lasted from the 30th May to the 30th July of 2022 and was conducted at the School of Computer Engineering of the University of Oviedo.
+\\\\
+The School of Computer Engineering is the main computer science faculty of the university of Oviedo and lies near the city center. Its location, close to the city center and to Winter Park, makes it a great place for students from abroad that want to visit. 
+\\
+Among the many research departments that are housed at the University of Oviedo I did my internship with tutors of the computer research department. This department is composed of 150 staff and covers multiple research subjects such as Human Computer Interaction, AI and Machine Learning, Internet of Things, Semantic Web and Artificial Vision.
+\\\\
+The goal of my internship was to participate in the development of a research project, understand all the typical phases of this kind of undertaking (study of the background, hypothesis development, experiment design and implementation, analysis, etc.) and participate in at least a part of them, including the dissemination that consists of the development of a poster and a research paper. 
+\\\\
+First of all, I’ll present the computer research department of the University of Oviedo. I'll explain how it is to be a researcher in Spain and then present the research project I’ve conducted with my Spanish partner at the Computing school of the University of Oviedo. I’ll also comment on my stay in general, going into detail about how I adapted to a place with different customs and a language that I do not speak.
+Finally, we’ll take an in-depth look at the contributions of the study.
+
+\newpage
+\section{Context}
+
+\subsection{Computing department - University of Oviedo}
+The history of this department of the University of Oviedo dates back to 1982. As of today, most of the researchers give computing courses at the School of Computing of the University of Oviedo.
+The department is currently headed by Susana Irene Díaz Rodríguez.
+\\
+The School of Computing has good student capacity with its 6 theory classrooms, one assembly hall for lectures and 15 laboratories. It is also well equipped with both PC and Mac.
+\\
+They teach a computer software engineering bachelor’s degree that gives the basic training to become a computer engineer with expertise in software development. It spans 4 years and has no specific entry requirements.
+They also teach a 1 year master’s degree in Web Engineering that gives advanced knowledge for future professionals or researchers in web technologies.
+
+\subsection{Being a researcher in Spain}
+The path to becoming a researcher in Spain mostly resembles the one in the French research sector.
+First of all, a PhD is required to demonstrate the acquisition of basic research skills.
+\\
+Before the PhD, a scholar needs to complete a Bachelor’s and Master’s degree with a minimum of 300 ECTS (European Credits Transfer System).
+\\
+To get a PhD in Spain, it is necessary to publish about  3 papers in a span of 3 to 4 years.
+There exists multiple grants to finance the PhD :
+\begin{itemize}
+\item National, there are two kinds, FPU which does not impose a project or FPI where research has to be done on a national subject. It is a 4 years grant and funds travels to conferences. It has a competitive selection process
+\item Regional
+\item University, it is the most difficult one to obtain and lends a salary of about 1000€/month
+\item EU grants in institutes of research
+\end{itemize}
+\\
+In Spain, researchers have mostly two work opportunities. They can do pure research in the private sector which has the benefit of lending a job more easily and a higher salary in the career beginning.
+Or, they can do research in the public administration which has two different paths.
+\\
+First is pure research in an institute such as CSIC in Spain. It contains a structure similar to INRIA in France.
+\\
+Second is research and teaching at universities. Currently, a wave of retirements is awaited in this sector so it represents a future opportunity. But, requirements became more difficult because of recent reforms.
+The most common way to get into the system is to give courses without a PhD to replace a teacher. Nowadays, this kind of position is only temporary and for a maximum period of 3 years.
+\\
+Another popular option is to become part time associated professor that works in the industry and teaches some courses (90 or 180 hours a year).
+Yet another entry option is to become adjudant lecturer without a PhD for a maximum period of 4 years, usually done during the PhD. After recent changes in legislature this position went to 120 hours of teaching a year, making it less attractive.
+\\\\
+Once the PhD has been acquired, the doctor can become a PhD adjudant lecturer for a maximum period of 4 years. The national agency for quality assessment ANECA certifies the formations and gives accreditation to people for this position based on a CV. If the certificate is not acquired, a period 1.5 years has to pass before the evaluation can be retaken. Another requirement to be certified by ANECA is to be a reviewer for a journal.
+\\
+After PhD adjudant lecturer the next step is to become a contracted professor. To get this position the person needs an international mention, meaning that they have conducted research in another country. This position does not have an expiration date.\\
+Then there is the position of associate professor that is a public position. It can be obtained with a minimum of 12 publications in journals.\\
+Finally, there is the position of full professor that can be obtained with a minimum of 27 publications in journals.
+\\\\
+To wrap up with, the work of a researcher is the same all over the world. A researcher follows a systematic routine of finding a gap, doing research in a specific field, creating a test, doing the test, applying statistical analysis, writing a paper and disseminating.
+\\
+To become a great researcher and teacher at the University, it requires to like teaching and research at the same time. A good work ethic is also required because there is little supervision of the work done.
+\\
+A researcher can basically research in any field he likes but needs to think about if he will get funds for it and if he will be able to find a research group in this field.
+
+\subsection{The project}
+The goal of this internship, which title is "IT Research Camp", was to conduct a full scale scientific study going from research to the writing of a paper.
+It was the second edition of this camp which is inspired by similar projects conducted in the United States whose goal is to make the Master and a continuation in research more attractive to students. Its goal is also to give the students an opportunity to practice English and to learn about other cultures and backgrounds.
+\\\\
+Courses were given all along the project in order to teach us how to handle each step of research.
+The courses that were given can be found in the \hyperlink{sem_chron}{seminar chronology}.
+\\\\
+The work had to be conducted in groups of two with one Spanish student of the University of Oviedo and an international student.
+All groups received a subject that laid the foundation for the research to come. In my case the subject was "Influence of Design Factors in Web Usability".
+\\
+Each week we met with all tutors to exchanging with them and to showcase our progress using slideshow presentations.
+\\
+This project took pace from the 30/05/2022 to the 30/07/2022 for a period of 2 months.
+\\\\
+
+
+\subsubsection{Project chronology}
+
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ |c|l| } 
+    \hline
+    \textbf{Week} & \textbf{Description}\\
+    \hline\hline
+    \textbf{1} & Reading papers to get acquainted with the state of the art and find a gap \\
+    \hline
+    \textbf{2} & Find a testing methodology and prepare a test prototype \\
+    \hline
+    \textbf{3} & Develop the test prototype \\
+    \hline
+    \textbf{4} & Conduct the experiment and share the test with social circles and university contacts \\
+    \hline
+    \textbf{5} & Analyse the data \\
+    \hline
+    \textbf{6} & Analyse the data \\
+    \hline
+    \textbf{7} & Create a poster \\
+    \hline
+    \textbf{8} & Write a paper \\
+    \hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Seminar chronology} \hypertarget{sem_chron}{}
+
+\begin{center}
+
+\begin{tabular}{ |c|l| } 
+    \hline
+    \textbf{Week} & \textbf{Description}\\
+    \hline\hline
+    \textbf{1} & Seminar about how to do documentation and user the Mendeley reference tool \\
+    \hline
+    \textbf{2} & Seminar about research publication \\
+    \hline
+    \textbf{3} & Seminar about statistical analysis \\
+    \hline
+    \textbf{4} & Seminar about machine learning \\
+    \hline
+    \textbf{5} & Seminar about creating graphic content like posters \\
+    \hline
+    \textbf{6} & \O \\
+    \hline
+    \textbf{7} & Seminar about being a researcher in Spain \\
+    \hline
+    \textbf{8} & \O \\
+    \hline
+\end{tabular}
+\end{center}
+
+\newpage
+\subsection{My stay in Spain outside of work}
+I never visited Spain before, and I came not knowing how to speak a full sentence in Spanish. Now I manage to understand it but can hardly speak it.
+During my stay I mostly used English as a means of communication with my tutor and coworkers but also with cashiers, bus drivers, police officers and receptionists.
+\\\\
+In my spare time I did numerous activities with my coworkers.
+We visited the city of Oviedo and its wonderful cathedral as well as many parts of the Asturian region.
+We went to the archaeological museums of Oviedo that showed me the vast history of this region.
+Culturally, the region of Asturias sets itself apart from the rest of Spain. The most prominent aspect of this is that the region has its own dialect called Asturian that dates back to the time when Asturias was a kingdom and before the Spanish we know imposed itself.
+\\\\
+It was a sporty stay as well.
+I went on a trip to the Christ statue and the chapels on the mountain nearby, a journey of 24000 steps.
+I also did a bike tour around Oviedo and walked almost daily to my workplace, passing in front of the impressive congress and exhibitions center.
+\\\\
+One of the most interesting things I discovered was the local cuisine. I had a wonderful culinary experience, tasting the second best burger of Spain and the best Burger of Asturias and eating freshly fished seafood.
+I also learned how to throw the well renowned Asturian cider by getting taught by one of my colleagues.
+We usually went out to the winter park after work and ate some snacks while playing Uno or other card games. This created a strong bond between us.
+\\\\
+During my stay I lived at the Mi Campus Student residence in Oviedo.
+I chose to take a shared room with two others but in the end, at my arrival, the wing of the building that housed the three people rooms was under construction and I got promoted to a two people room but still paying for a three people room.
+\\
+The room was well furnished with a bed, a desk, a chair and so on. But I quickly ran into a problem with my roommate who did not have the same hygiene standards as I. Three weeks into my stay, having talked many times with my roommate about the issue without seeing change, I couldn't hold it anymore and complained to the receptionist about the dire situation I was in. Luckily they kindly promoted me to a single room without charging me extra.
+\\
+This was a very satisfying turn of events that made me almost forget about the prior problem. From then on I enjoyed my stay to the fullest.
+
+\newpage
+\section{Contribution}
+
+\subsection{The research gap}
+Studies show that people spend increasingly more time on the internet and become more selective in the websites they visit. Thus, it becomes increasingly more important to attract the user's attention as it represents a substantial economic opportunity.
+Many researches have tried to find better ways of grabbing the user's attention. The most interesting theory is that sans serif is more readable than serif typefaces.
+\\\\
+How does font impact web usability?
+In order to get to know our field of research we had to read the papers relating to it.
+To track the papers we were reading and in order to create a library of papers, we used the Mendeley tool.
+During our first lecture we were taught how to use it. It is a powerful collaborative library that can extract research papers as PDFs from websites with all the information related to it (authors, date of publication, abstract, paper it was published in and so on).
+\\
+To cover up more ground, my coworker and I decided to read different papers and to do daily meetings to discuss if we would keep them or not depending on if they were related to our subject.
+Here the courses of PRDS (Projet de Recherche et de Documentation Scientifique) I attended at the University of Strasbourg helped me out quite a bit and I could reuse the paper synthesis skills I had acquired.
+\\
+In the end we categorized 59 papers and kept 14 that we read fully and that were most related to our work. We used them to back up our study.
+\\
+The gap we found in all those papers we kept was that their studies did not compare the serif and sans serif characteristic inside the same family as they usually choose fonts with different styles such as Times New Roman vs. Arial.
+We decided to study the reading speed of users on a website as it was only ever tested on text heavy documents. We also studied user preference as it can affect their opinion on the website.
+
+\subsection{Testing methodology}
+We decided to conduct an AB test, changing only the serif and sans serif characteristics because they were found to make the user more at ease on an e-commerce website in a 2008 study conducted by Sasidharan and Dhanesh.
+\\
+We decided to use Roboto which is the most popular web-typeface as of 2022 according to Google Fonts Analytics.
+The font size used in the study we conducted is 16px which is the default size used by most browsers such as Google Chrome, Firefox and Edge.
+\\
+The test was based on an e-commerce website that sells fruits and vegetables that was adapted from an old web programming project of my coworker.
+It contains the most common e-commerce characteristics such as a grid of products, a product detail page and a shopping cart.
+\\
+\\
+I developed the data collection algorithm that stores the time spent on a page, click activity and mouse position.
+I also developed the form validation and the data transfer to a remote database once the user had fully completed the test.
+To store the data remotely I chose Back4App which is an online database with a JavaScript framework that I could use in our static website.
+\\
+Another part of my work was to create a translation system that could translate the full website in Spanish, French or English. The base website was always displayed in English so we gave the user the choice to choose his language at the beginning of the test.
+\\\\
+The participants were given three sequential tasks to complete the experiment on our website:
+\begin{itemize}
+\item Buy a product
+\item Read a product description
+\item Answer an anonymous questionnaire to measure usability and typeface preference
+\end{itemize}
+\\
+The website was created so that the main page shows the instructions for the first task, that essentially asks the user to complete a full purchase. There, users are asked to find a specific product, add it to the cart and buy it. Once they click the continue button, users see the grid of products so that they can start with the task. When a user clicks on the buy button, they are redirected to the instructions of the second task. In this first task we measured the time it took to complete it, and how typeface influences the purchase process.
+\\
+\\
+For the second task users have to read the description of a specific product. The text was taken from a paragraph of the Potatoes page of Wikipedia. In this test we measured the reading speed and comprehension to obtain information about the impact of different typefaces while reading a longer text. Users were warned about the reading comprehension question in order to dissuade them from skipping directly to the questionnaire. 
+\\
+\\
+Last, the questionnaire consists of multiple input fields to gather user information such as age and gender. It also includes a reading comprehension question and a usability questionnaire.
+\\
+\\
+Screenshots of the website prototype we created can be seen in figures 1 to 5.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width = 5.5cm]{Resources/Images/Figure 1.png}
+\caption{Grid of products on a mobile phone}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width = 5.5cm]{Resources/Images/Figure 2.png}
+\caption{Description page of a product on a mobile phone}
+
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width = 6cm]{Resources/Images/Figure 3.png}
+\caption{Cart after a product was added on a mobile phone}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width = 6cm]{Resources/Images/Figure 4.png}
+\caption{Part of the product description on a mobile phone}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width = 6cm]{Resources/Images/Figure 5.png}
+\caption{Part of the questionnaire on a mobile phone}
+\end{figure}
+
+
+\subsection{Data processing and analysis}
+Once we shared the experiment with our contacts, we quickly received many entries over the span of two weeks.
+We got 882 participants from which 467 came from Pakistan, 250 from Spain and 54 from France.
+\\
+But, the data we collected from our experiment could not be used as is. It included duplicates that were generated by a submission bug. We also had instances where the user spent more than 400 years on the webpage. On the other hand we also had to remove human error elements such as participants with an age less than 5 years or older than 100 years.
+\\
+In the end we were left with about 246 usable entries.
+We applied winsorizing to cut out the outliers that overstepped the 99th percentile of time spent on the website.
+\\\\
+Once the data was cleaned, we could apply some processing steps such as multiple linear regression analysis.
+
+\subsection{Research results}
+
+\subsubsection{Results}
+Out of the 246 participants, 134 are male and 112 female, with a mean age of 27 years. 179 users completed the experiment in English, 50 in Spanish and 17 in French. 83 failed to answer correctly to the reading comprehension question. This leaves us with 163 that answered correctly which is 66\%.
+\\\\
+The following are the differences between the Roboto and Roboto Serif groups:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ l|c|r } 
+    & \textbf{Roboto} & \textbf{Roboto Serif} \\
+    \hline
+    Total number of participants & 110 &  136 \\ 
+    Mean typography score & 7.84 & 7.93 \\ 
+    Mean female typography score & 7.963 &  8.414\\
+    Mean male typography score & 7.714 & 7.564 \\ 
+    Mean SUPR-Q score & 7.12 & 7.16 \\ 
+    Percentage of reading comprehension correct answers & 65\% & 68\% \\
+\end{tabular}
+\caption{\label{tab:difffonts}Results of metrics for Roboto and Roboto Serif}
+\end{table}
+
+The following are basic statistics of the time spent by users on the first task, the second task and the questionnaire measured in seconds:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ l|c|c|c|c|c|r } 
+\multicolumn{1}{c}{}  &
+\multicolumn{2}{c}{\textbf{First Task}}  &
+\multicolumn{2}{c}{\textbf{Second Task}}  & \multicolumn{2}{c}{\textbf{Questionnaire}} \\
+     \textbf{typeface} & \textbf{mean} & \textbf{std}& \textbf{mean} & \textbf{std}& \textbf{mean} & \textbf{std}\\
+    \hline
+     Roboto & 27.892 & 14.560 & 62.103 & 35.025  & 88.357 & 29.899 \\
+     Roboto Serif & 30.228 & 18.596 & 58.176 & 36.329  & 84.670 & 26.979\\
+\end{tabular}
+\caption{\label{tab:statisticssecondtask}Basic statistics for the time in seconds it took to complete the tasks}
+\end{table}
+
+
+% Regression analysis results
+\subsection*{Multiple linear regression analysis}
+These are the results of the regression analysis along with their specific equations:
+
+\subsubsection*{Reading comprehension}
+\begin{equation}
+reading\_comprehension = 0.769 + 0.022 * x_1 - 0.003 * x_2 - 0.100 * x_3
+\label{eq:comprehensionregression}
+\end{equation}
+\begin{table}[H]
+\centering
+\begin{tabular}{ l|c|c|c|c|c|r } 
+     \multicolumn{3}{c}{} & \multicolumn{4}{c}{\textbf{P-value of independent variables}} \\
+    \hline
+     Adjusted R-squared & F-statistic & P-value of F-statistic & constant & typeface & age & gender \\
+     0.003 & 1.284 & 0.281 & 0.000 & 0.713 & 0.355 & 0.100 \\
+\end{tabular}
+\caption{\label{tab:comprehensionreg}Regression analysis results for the predicted variable reading comprehension.}
+\end{table}
+
+\subsubsection*{Total time}
+\begin{equation}
+total\_time = 210400 - 7054.873 * x_1 + 235.965 * x_2 - 11180 * x_3
+\label{eq:totaltimeregression}
+\end{equation}
+\begin{table}[H]
+\centering
+\begin{tabular}{ l|c|c|c|c|c|r } 
+     \multicolumn{3}{c}{} & \multicolumn{4}{c}{\textbf{P-value of independent variables}} \\
+    \hline
+     Adjusted R-squared & F-statistic & P-value of F-statistic & constant & typeface & age & gender \\
+     -0.004 & 0.712 & 0.546 & 0.000 & 0.457 & 0.610 & 0.238 \\
+\end{tabular}
+\caption{\label{tab:totaltimereg}Regression analysis results for the predicted variable total time.}
+\end{table}
+
+\subsubsection*{Reading time}
+\begin{equation}
+reading\_time = 63000 - 3994.0342 * x_1 - 18.048 * x_2 - 843.344 * x_3
+\label{eq:readingtimeregression}
+\end{equation}
+\begin{table}[H]
+\centering
+\begin{tabular}{ l|c|c|c|c|c|r } 
+     \multicolumn{3}{c}{} &
+     \multicolumn{4}{c}{\textbf{P-value of independent variables}} \\
+    \hline
+     Adjusted R-squared & F-statistic & P-value of F-statistic & constant & typeface & age & gender \\
+     -0.009 & 0.256 & 0.857 & 0.000 & 0.388 & 0.936 & 0.855\\ 
+\end{tabular}
+\caption{\label{tab:readingtimereg}Regression analysis results for the predicted variable reading time.}
+\end{table}
+
+\subsubsection*{SUPR-Q score}
+\begin{equation}
+SUPR-Q\_score = 7.362 + 0.055 * x_1 - 0.017 * x_2 + 0.452 * x_3
+\label{eq:suprqscoreregression}
+\end{equation}
+\begin{table}[H]
+\centering
+\begin{tabular}{ l|c|c|c|c|c|r } 
+    \multicolumn{3}{c}{} &
+     \multicolumn{4}{c}{\textbf{P-value of independent variables}} \\
+    \hline
+     Adjusted R-squared & F-statistic & P-value of F-statistic & constant & typeface & age & gender \\
+     0.004 & 1.351 & 0.259 & 0.000 & 0.847 & 0.219 & 0.114\\
+\end{tabular}
+\caption{\label{tab:suprqscoretable}Regression analysis results for the predicted variable SUPR-Q score.}
+\end{table}
+
+\subsubsection*{Typography score}
+\begin{equation}
+typography\_score = 8.331 +  0.105 * x_1 - 0.029 * x_2 + 0.579 * x_3
+\label{eq:typographyscoreregression}
+\end{equation}
+\begin{table}[H]
+\centering
+\begin{tabular}{ l|c|c|c|c|c|r } 
+    \multicolumn{3}{c}{} &
+     \multicolumn{4}{c}{\textbf{P-value of independent variables}} \\
+    \hline
+     Adjusted R-squared & F-statistic & P-value of F-statistic & constant & typeface & age & gender \\
+     0.021 & 2.717 & 0.045 & 0.000 & 0.719 & 0.044 & 0.048\\
+\end{tabular}
+\caption{\label{tab:typographyscoretable}Regression analysis results for the predicted variable typography score.}
+\end{table}
+
+\subsubsection*{Typography score for Roboto}
+\begin{equation}
+typography\_score\_roboto = 8.339 - 0.043 * x_2 + 0.298 * x_3
+\label{eq:typographyscorerobotoreg}
+\end{equation}
+\begin{table}[H]
+\centering
+\begin{tabular}{ l|c|c|c|c|c|r } 
+     \multicolumn{3}{c}{} &
+     \multicolumn{4}{c}{\textbf{P-value of independent variables}} \\
+    \hline
+     Adjusted R-squared & F-statistic & P-value of F-statistic & constant & typeface & age & gender \\
+     0.015 & 1.828 & 0.166 & 0.000 & \O & 0.069 & 0.521\\
+\end{tabular}
+\caption{\label{tab:typographyscorerobotoreg}Regression analysis results for the predicted variable typography score for Roboto.}
+\end{table}
+
+\subsubsection*{Typography score for Roboto Serif}
+\begin{equation}
+typography\_score\_robotoserif = 8.028 - 0.017 * x_2 + 0.835 * x_3
+\label{eq:typographyscorerobotoserifregression}
+\end{equation}
+\begin{table}[H]
+\centering
+\begin{tabular}{ l|c|c|c|c|c|r }  
+     \multicolumn{3}{c}{} &
+     \multicolumn{4}{c}{\textbf{P-value of independent variables}} \\
+    \hline
+     Adjusted R-squared & F-statistic & P-value of F-statistic & constant & typeface & age & gender \\
+     0.031 & 3.124 & 0.047 & 0.000 & \O & 0.323 & 0.026 \\
+\end{tabular}
+\caption{\label{tab:typographyscorerobotoserifreg}Regression analysis results for the predicted variable typography score for Roboto Serif.}
+\end{table}
+
+\subsubsection{Discussion}
+After conducting the analysis with the reading comprehension as the predicted variable we found that the typeface, age and gender have no significant impact on this variable, according to the p-values in table \ref{tab:comprehensionreg}.
+\\\\
+In tables \ref{tab:totaltimereg}, \ref{tab:readingtimereg} and \ref{tab:suprqscoretable}, given that the p-values are all higher than 0.05, we can deduce that neither typeface, age or gender affect the total time of the experiment, the completion time for the second task, the reading comprehension or the SUPR-Q score that measures the usability of the website.
+\\\\
+For the typography score, in table \ref{tab:typographyscoretable}, the only p-values lower than 0.05 are those of the age and gender, meaning these variables might have an impact on that score.\\
+To know in detail how those characteristics affect the score, we performed regression analysis in the typography score for both Roboto and Roboto Serif.
+\\\\
+For Roboto, the sans serif typeface, as seen in table \ref{tab:typographyscorerobotoreg}, the p-value for age is 0.068, between 0.1 and 0.05, which could indicate that age has a slight impact on the typography score, but, given that the p-value of the F-statistic is higher than 0.05, we cannot say that age affects user preference.
+\\\\
+For Roboto Serif, the serif typeface, gender makes a difference in the typography score according to the p-value of gender being less than 0.05 in table \ref{tab:typographyscorerobotoserifreg} and the p-value of the F-statistic being also inferior to 0.05. Females tend to prefer this typeface compared to males.
+
+\newpage
+\subsubsection{Research conclusion}
+The first conclusion obtained from the analysis is that there are no significant differences in user typeface preference and usability between Roboto and Roboto Serif. There are also no significant differences in reading comprehension of texts written in serif or sans serif in the same font family, and the same is true for task completion time. Regarding gender, the serif typeface is more preferred by female participants than male participants, but no differences were found for sans serif.
+\\\\
+With these statements we can conclude that the serif or sans serif characteristics inside of the same font family do not impact web usability. This conclusion is important for the industry given that most e-commerce websites are currently using sans serif typefaces, thus it could be studied whether different styles of typefaces do affect usability and readability.
+\\\\
+Though, these results might be different if tested with typefaces of different styles, given that our study is limited to only one font family. Our research is also limited due to having performed our experiments in an uncontrolled environment.
+\\\\
+For future work experiments could be conducted in an controlled environment using an eye-tracker to gather more measurements relative to readability such as fixations on call-to-action buttons, number of fixations and fixation duration on the text of the website. It would be interesting as well to measure other characteristics of typefaces such as font size and line length.
+
+\subsection{Synthesis}
+\subsubsection{Poster creation}
+In order to showcase our results in a straightforward way we created a poster.
+\\
+A poster is a form of scientific vulgarization that is presented mostly in a portrait format and shows a synthesized version of the findings of a research.
+\\
+To create this poster we used PowerPoint and applied the teachings of the seminar about poster creation.
+I worked on the Results and Conclusion sections.
+\\
+See figure \ref{fig:tikzpgf} in the appendices.
+
+\subsubsection{Writing of a paper}
+The final step of this internship was to write a scientific paper.
+To write it we used the knowledge we acquired during the seminar about how to write a scientific paper.
+\\
+We used a collaborative tool called Overleaf that allowed us to write simultaneously in a document using a markup language called \LaTeX.
+A markup language is an abstract language with labels that are translated by a compiler to create, for example, a PDF.
+As a side note, I also use \LaTeX to write this report.
+\\
+In this paper, I mostly worked on the introduction, results and conclusion.
+\\
+This paper is part of my coworker's first PhD publication and it was sent to a research paper called PeerJ in which we hope it will be published.
+If it were to be accepted, this would mark the end of a full research cycle.
+
+
+\newpage
+
+\section{Conclusion}
+All in all, this experience has been both culturally and professionally enriching.
+I had the opportunity to discover Oviedo and the region of Asturias during my free time with my coworkers. I worked in a multicultural environment and learned a lot about the different cultures of my colleagues.
+\\
+I also had a truly immersive experience in the shoes of a researcher and could complete a full research project in only two months. I participated in the creation of a poster and in the writing of a paper which was new to me.
+\\
+I found the experience quite pleasing and exciting because of the diversity of challenges it offers. It always kept me on edge, and I never got bored.
+To conclude, this internship helped me in my professional path choices, and I envision myself following up my masters with a PhD.
+
+\newpage
+\section{Appendices}
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.67\textwidth]{Resources/poster.pdf}
+    \caption{Poster of our research project}
+    \label{fig:tikzpgf}
+\end{figure}
+\end{document}
