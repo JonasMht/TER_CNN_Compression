@@ -136,14 +136,15 @@ def smooth(scalars, weight):  # Weight between 0 and 1
 
 def load_model(model, device, path=""):
 	ngpu = torch.cuda.device_count()
-	if len(path)>0:
-		state_dict = torch.load(path)
-		model.load_state_dict(state_dict)
+
 	model.to(device=device)
 
 	if (device.type == 'cuda'):
 		print("Data Parallel")
 		model = nn.DataParallel(model, list(range(ngpu)))
+	
+	if len(path)>0:
+		model.load_state_dict(torch.load(path))
 	
 	return model
 

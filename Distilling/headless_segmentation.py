@@ -66,8 +66,9 @@ python3.6 -m pip install torchvision
 """
 
 # Glbal teacher model
-n_epochs = 1
+n_epochs = 150
 n_models = 20
+n_iter = 10
 
 
 date = str(datetime.now()).split(' ')[0]
@@ -116,7 +117,7 @@ nc = 3
 amp = False
 
 save_path =  "../Data/Saves/" + session_name+"/"
-model_path = save_path+"newtork_weigths/"
+model_path = save_path+"network_weigths/"
 log_path = save_path+"logs/"
 fig_path = save_path+"fig/"
 
@@ -268,7 +269,7 @@ for i in range(1, n_models+1):
 	if not os.path.exists(d_model_path):
 		os.mkdir(d_model_path)
 
-	for j in range(10):
+	for j in range(1, n_iter+1):
 		d_model_iter_folder = d_model_path+"iter_"+str(j)+"/"
 		nd_model_iter_folder = nd_model_path+"iter_"+str(j)+"/"
 
