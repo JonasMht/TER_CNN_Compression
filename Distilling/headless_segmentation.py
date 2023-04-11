@@ -89,7 +89,6 @@ dataset_folder = "/home/mehtali/TER_CNN_Compression/Data/training-data/data/IGBM
 
 train_list = dataset_folder+"train_4000_i3.txt"
 teacher_train_list = dataset_folder+"train_10000_i3.txt"
-test_list = dataset_folder+"test_5000-7500_i3.txt"
 validate_list = dataset_folder+"test_1000.txt"
 
 # For debug
@@ -196,10 +195,6 @@ teacher_train_dataset = SegmentationDataSet(root=dataset_folder,
 							  )
 
 # Not a good idea to augment the test data
-test_dataset = SegmentationDataSet(root=dataset_folder,
-								list_path=test_list
-								)
-# Not a good idea to augment the test data
 validate_dataset = SegmentationDataSet(root=dataset_folder,
 								list_path=validate_list
 								)
@@ -215,11 +210,6 @@ teacher_train_dataloader= torch.utils.data.DataLoader(teacher_train_dataset,
 											   batch_size=batch_size,
 											   shuffle=True,
 											   num_workers=workers)
-
-test_dataloader = torch.utils.data.DataLoader(test_dataset,
-											  batch_size=batch_size,
-											  shuffle=True,
-											  num_workers=workers)
 
 validation_dataloader = torch.utils.data.DataLoader(validate_dataset,
 											  batch_size=batch_size,
@@ -243,13 +233,12 @@ log_file = open(log_path+"model_performance.txt", "w")
 log_file.write("Best Dice\tModel Name\n")
 log_file.flush()
 
+teacher_model_path = "/home/mehtali/TER_CNN_Compression/Distilling/teacher_model_param_3352257.pth"
 # Teacher model
-teacher_model = load_model(UNet_modular(channel_depth=32, n_channels=3, n_classes=1), device)
-model_descr = "teacher_model_param_{}".format(get_trainable_param(teacher_model))
-teacher_load_path = ""
-if teacher_load_path != "":
-	teacher_model.load_state_dict(torch.load(teacher_load_path))
-else:
+teacher_model = load_model(UNet_modular(channel_depth=32, n_channels=3, n_classes=1), device, teacher_model_path)
+
+if teacher_model_path == "":
+	model_descr = "teacher_model_param_{}".format(get_trainable_param(teacher_model))
 	# Train teacher Model
 	teacher_model, best_dice = model_training(teacher_model, teacher_train_dataloader, validation_dataloader, train, evaluate, n_epochs)
 	teacher_model_path = model_path+"teacher/"

@@ -219,7 +219,7 @@ d_models = load_models(model_path, "/d_model")
 
 # Create the csv file
 csv_file = open(log_path+"evaluation.csv", "w")
-csv_file.write("model_type, model_depth, model_variation, dice_coef\n")
+csv_file.write("model_type model_depth model_variation dice_coef\n")
 
 i = 1
 for depth_models in nd_models:
@@ -227,7 +227,7 @@ for depth_models in nd_models:
 	for nd_model_variation in depth_models:
 		dice = evaluate(nd_model_variation, test_dataloader)
 		model_param = get_trainable_param(nd_model_variation)
-		csv_file.write("nd_model, "+str(model_param)+", "+str(j)+", "+str(dice)+"\n")
+		csv_file.write("nd_model "+str(model_param)+" "+str(j)+" "+str(dice).replace('.',',')+"\n")
 		j+=1
 	i+=1
 
