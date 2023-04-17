@@ -311,6 +311,65 @@ def train_distilled(model, optimizer, train_loader, other_model=None):
 
 	return mean_dice
 
+
+# Train each distilled model layer on the error of each later of the teacher model
+def train_layer_wise_distillation(student_model, optimizer, train_loader, teacher_model=None):
+	T = 1  # temperature for distillation loss
+	# Using a higher value for T produces a softer probability distribution over classes
+	alpha = 0.95
+	# trade-off between soft-target (st) cross-entropy and true-target (tt) cross-entropy;
+	# loss = alpha * st + (1 - alpha) * tt
+
+	teacher_model.eval().cuda()
+	student_model.train().cuda()
+	dl = []
+
+	teacher_num_layers = len(list(teacher_model.children()))
+	student_num_layers = len(list(student_model.children()))
+	assert(teacher_num_layers == student_num_layers)
+
+	total = len(train_loader)*train_loader.batch_size*teacher_num_layers
+
+	total = len(train_loader)*train_loader.batch_size*len(list(teacher_model.children()))
+	with tqdm(total=total, desc=f'Training', unit='img') as pbar:
+		for layer_num, (teacher_layer, student_layer) in enumerate(zip(teacher_model.children(), student_model.children())):
+			# Get the output of the layer for the teacher network
+			teacher_layer = nn.Sequential(teacher_layer)
+			total_loss = 0.0
+			for i, (img, gt) in enumerate(train_loader):
+				optimizer.zero_grad()
+				#print('i', i)
+				if torch.cuda.is_available():
+					img, gt = img.cuda(), gt.cuda()
+				
+				img, gt = Variable(img), Variable(gt)
+
+				# Forward pass with teacher network
+				with torch.no_grad():
+					teacher_outputs = teacher_model(img)
+					teacher_layer_outputs = teacher_layer(img)
+				
+				# Forward pass with student network
+				student_outputs = student_model(img)
+				dice = dice_coeff(student_outputs, gt)
+				dl.append(dice.item())
+				student_layer = nn.Sequential(*list(student_model.children())[:layer_num+1])
+				student_layer_outputs = student_layer(img)
+
+				distillation_loss = dice_loss(student_layer_outputs, teacher_layer_outputs)
+				#loss = dice_loss(F.softmax(student_outputs/T, dim=1), F.softmax(teacher_outputs/T, dim=1)) * (T * T) * alpha + dice_loss(student_layer_outputs, teacher_outputs) * (1. - alpha)
+				loss = distillation_loss
+				# Backward pass and optimization
+				loss.backward()
+				optimizer.step()
+
+				pbar.update(len(img))
+				pbar.set_postfix(**{'loss': loss.item(), "dice": np.mean(dl)})
+
+	mean_dice = np.mean(dl)
+
+	return mean_dice
+
 def model_training(model, train_loader, val_loader, trainFun, evalFun, n_epochs, name="", other_model=None):
 	optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 	scheduler = StepLR(optimizer, step_size = 100, gamma = 0.2)
@@ -332,18 +391,11 @@ def model_training(model, train_loader, val_loader, trainFun, evalFun, n_epochs,
 		#evaluate for one epoch on validation set
 		valid_dice = evalFun(model, val_loader)
 		
-		#if val_metric is best, add checkpoint
-		if (epoch%10 == 0 or epoch==(n_epochs-1)):
-			scheduled_saves+=1
-		
 
 		if former_best_dice < valid_dice:
 			# dice is increasing
 			early_stopping_streak = 0
 			best_model = copy.deepcopy(model)
-			if name != "" and scheduled_saves > 0:
-				scheduled_saves -= 1
-				save_model(model, model_path+name+"_dice_{:.3f}_loss_{:.3f}_epoch_{}.pth".format(valid_dice, valid_loss, epoch+1))
 		else:
 			# Is decresing
 			early_stopping_streak += 1

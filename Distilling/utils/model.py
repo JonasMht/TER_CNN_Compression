@@ -150,10 +150,11 @@ class UNet(nn.Module):
 
 class UNet_modular(nn.Module):
     def __init__(self, channel_depth, n_channels, n_classes):
+        super(UNet_modular, self).__init__()
         self.channel_depth = channel_depth
         self.n_channels = n_channels
         self.n_classes = n_classes
-        super(UNet_modular, self).__init__()
+
         self.inc = InConv(n_channels, channel_depth)
         self.down1 = Down(channel_depth, channel_depth*2)
         self.down2 = Down(channel_depth*2, channel_depth*4)
@@ -177,6 +178,7 @@ class UNet_modular(nn.Module):
         x = self.up4(x, x1)
         x = self.outc(x)
         return x
+
 
 class Generator(nn.Module):
     def __init__(self, ngpu):

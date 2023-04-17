@@ -229,13 +229,14 @@ print("mask source :", batch[1].shape)
 
 # Training
 
-log_file = open(log_path+"model_performance.txt", "w")
+log_file = open(log_path+"teacher_model_performance.txt", "w")
 log_file.write("Best Dice\tModel Name\n")
 log_file.flush()
 
 teacher_model_path = "/home/mehtali/TER_CNN_Compression/Distilling/teacher_model_param_3352257.pth"
 # Teacher model
 teacher_model = load_model(UNet_modular(channel_depth=32, n_channels=3, n_classes=1), device, teacher_model_path)
+
 
 if teacher_model_path == "":
 	model_descr = "teacher_model_param_{}".format(get_trainable_param(teacher_model))
@@ -248,43 +249,65 @@ if teacher_model_path == "":
 	log_file.write("Dice : {:.3f}\tModel : {}\n".format(best_dice, model_descr))
 	log_file.flush()
 
-# Train smaller models
-for i in range(1, n_models+1):
-	d_model_path = model_path+"d_model_"+str(i)+"/"
-	nd_model_path = model_path+"nd_model_"+str(i)+"/"
+log_file.close()
+
+# Distilled model
+log_file = open(log_path+"distilled_model_performance.txt", "a")
+
+# Train distilled models
+if True:
+	for i in range(1, n_models+1):
+		d_model_path = model_path+"d_model_"+str(i)+"/"
+		
+		
+		
+		if not os.path.exists(d_model_path):
+			os.mkdir(d_model_path)
+
+		for j in range(1, n_iter+1):
+			d_model_iter_folder = d_model_path+"iter_"+str(j)+"/"
+			if not os.path.exists(d_model_iter_folder):
+				os.mkdir(d_model_iter_folder)
+
+			# Train 10 models per depth modification
+
+			# Distilled model
+			model = load_model(UNet_modular(channel_depth=2*i, n_channels=3, n_classes=1), device)
+			model_descr = "d_model_{}_iteration_{}_param_{}".format(i, j, get_trainable_param(model))
+			nd_model, best_dice = model_training(model, train_dataloader, validation_dataloader, train_layer_wise_distillation, evaluate, n_epochs, other_model=teacher_model)
+			save_model(model, d_model_iter_folder+model_descr+".pth")
+			log_file.write("Dice : {:.3f}\tModel : {}\n".format(best_dice, model_descr))
+			log_file.flush()
+
+
+			
+
+log_file.colse()
+
+
+log_file = open(log_path+"not_distilled_model_performance.txt", "a")
+
+# Train non distilled models
+if False:
+	for i in range(1, n_models+1):
+		nd_model_path = model_path+"nd_model_"+str(i)+"/"
+		if not os.path.exists(nd_model_path):
+			os.mkdir(nd_model_path)
+		
+		for j in range(1, n_iter+1):
+			nd_model_iter_folder = nd_model_path+"iter_"+str(j)+"/"
+			if not os.path.exists(nd_model_iter_folder):
+				os.mkdir(nd_model_iter_folder)
+
+			# Train 10 models per depth modification
+
+			# Not Distilled model
+			model = load_model(UNet_modular(channel_depth=2*i, n_channels=3, n_classes=1), device)
+			model_descr = "nd_model_{}_iteration_{}_param_{}".format(i, j, get_trainable_param(model))
+			d_model, best_dice = model_training(model, train_dataloader, validation_dataloader, train, evaluate, n_epochs)
+			save_model(model, nd_model_iter_folder+model_descr+".pth")
+			log_file.write("Dice : {:.3f}\tModel : {}\n".format(best_dice, model_descr))
+			log_file.flush()
 	
-	if not os.path.exists(nd_model_path):
-		os.mkdir(nd_model_path)
-	if not os.path.exists(d_model_path):
-		os.mkdir(d_model_path)
-
-	for j in range(1, n_iter+1):
-		d_model_iter_folder = d_model_path+"iter_"+str(j)+"/"
-		nd_model_iter_folder = nd_model_path+"iter_"+str(j)+"/"
-
-		if not os.path.exists(d_model_iter_folder):
-			os.mkdir(d_model_iter_folder)
-		if not os.path.exists(nd_model_iter_folder):
-			os.mkdir(nd_model_iter_folder)
-
-		# Train 10 models per depth modification
-
-		# Distilled model
-		model = load_model(UNet_modular(channel_depth=2*i, n_channels=3, n_classes=1), device)
-		model_descr = "d_model_{}_iteration_{}_param_{}".format(i, j, get_trainable_param(model))
-		nd_model, best_dice = model_training(model, train_dataloader, validation_dataloader, train_distilled, evaluate, n_epochs, other_model=teacher_model)
-		save_model(model, d_model_iter_folder+model_descr+".pth")
-		log_file.write("Dice : {:.3f}\tModel : {}\n".format(best_dice, model_descr))
-		log_file.flush()
-
-
-		# Not Distilled model
-		model = load_model(UNet_modular(channel_depth=2*i, n_channels=3, n_classes=1), device)
-		model_descr = "nd_model_{}_iteration_{}_param_{}".format(i, j, get_trainable_param(model))
-		d_model, best_dice = model_training(model, train_dataloader, validation_dataloader, train, evaluate, n_epochs)
-		save_model(model, nd_model_iter_folder+model_descr+".pth")
-		log_file.write("Dice : {:.3f}\tModel : {}\n".format(best_dice, model_descr))
-		log_file.flush()
-
 
 log_file.close()
