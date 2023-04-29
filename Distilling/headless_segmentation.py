@@ -274,7 +274,7 @@ if True:
 			# Distilled model
 			model = load_model(UNet_modular(channel_depth=2*i, n_channels=3, n_classes=1), device)
 			model_descr = "d_model_{}_iteration_{}_param_{}".format(i, j, get_trainable_param(model))
-			nd_model, best_dice = model_training(model, train_dataloader, validation_dataloader, train_layer_wise_distillation, evaluate, n_epochs, other_model=teacher_model)
+			nd_model, best_dice = model_training(model, train_dataloader, validation_dataloader, train_feature_embedding, evaluate, n_epochs, other_model=teacher_model)
 			save_model(model, d_model_iter_folder+model_descr+".pth")
 			log_file.write("Dice : {:.3f}\tModel : {}\n".format(best_dice, model_descr))
 			log_file.flush()

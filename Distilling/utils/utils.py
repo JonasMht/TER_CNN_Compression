@@ -28,108 +28,140 @@ from datetime import datetime
 import copy # To make a copy of a model
 
 def preprocessing(img, mask, device, crop=False):
-    if not isinstance(img, np.ndarray):
-        img = np.asarray(img)
+	if not isinstance(img, np.ndarray):
+		img = np.asarray(img)
 
-    if crop:
-        img = img[0:1536-256, 0:1536-256]
+	if crop:
+		img = img[0:1536-256, 0:1536-256]
 
-    # img = np.transpose(img, (2,0,1))
-    img = np.expand_dims(img, axis=0)
-    img = img/255
-    img = torch.as_tensor(img.copy()).float().contiguous()
-    tmp = torch.randn(1, 3, img.shape[1], img.shape[2])
-    tmp[0] = img
-    img = tmp.to(device=device, dtype=torch.float32)
+	# img = np.transpose(img, (2,0,1))
+	img = np.expand_dims(img, axis=0)
+	img = img/255
+	img = torch.as_tensor(img.copy()).float().contiguous()
+	tmp = torch.randn(1, 3, img.shape[1], img.shape[2])
+	tmp[0] = img
+	img = tmp.to(device=device, dtype=torch.float32)
 
-    if not isinstance(mask, np.ndarray):
-        mask = np.asarray(mask)
+	if not isinstance(mask, np.ndarray):
+		mask = np.asarray(mask)
 
-    if crop:
-        mask = mask[0:1536-256, 0:1536-256]
+	if crop:
+		mask = mask[0:1536-256, 0:1536-256]
 
-    mask = np.expand_dims(mask, axis=0)
-    # mask = mask/255
-    mask_pipe = torch.as_tensor(mask.copy()).float().contiguous()
-    mask_pipe_ret = mask_pipe[None, :, :, :].to(
-        device=device, dtype=torch.long)
+	mask = np.expand_dims(mask, axis=0)
+	# mask = mask/255
+	mask_pipe = torch.as_tensor(mask.copy()).float().contiguous()
+	mask_pipe_ret = mask_pipe[None, :, :, :].to(
+		device=device, dtype=torch.long)
 
-    return img, mask_pipe_ret
+	return img, mask_pipe_ret
 
 
 def IoU(res, mask):
-    inter = np.logical_and(res, mask)
-    union = np.logical_or(res, mask)
+	inter = np.logical_and(res, mask)
+	union = np.logical_or(res, mask)
 
-    iou_score = np.sum(inter) / np.sum(union)
+	iou_score = np.sum(inter) / np.sum(union)
 
-    return iou_score
+	return iou_score
 
 
 def postprocessing(res_seg):
 
-    res_seg[res_seg < 0.5] = 0
-    res_seg[res_seg > 0.5] = 1
+	res_seg[res_seg < 0.5] = 0
+	res_seg[res_seg > 0.5] = 1
 
-    where_0 = np.where(res_seg == 0)
-    where_1 = np.where(res_seg == 1)
+	where_0 = np.where(res_seg == 0)
+	where_1 = np.where(res_seg == 1)
 
-    res_seg[where_0] = 1
-    res_seg[where_1] = 0
+	res_seg[where_0] = 1
+	res_seg[where_1] = 0
 
-    return (res_seg)
+	return (res_seg)
 
 
 def dice_coeff(input: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon=1e-6):
-    # Average of Dice coefficient for all batches, or for a single mask
-    assert input.size() == target.size()
-    if input.dim() == 2 and reduce_batch_first:
-        raise ValueError(
-            f'Dice: asked to reduce batch but got tensor without batch dimension (shape {input.shape})')
+	# Average of Dice coefficient for all batches, or for a single mask
+	assert input.size() == target.size()
+	if input.dim() == 2 and reduce_batch_first:
+		raise ValueError(
+			f'Dice: asked to reduce batch but got tensor without batch dimension (shape {input.shape})')
 
-    if input.dim() == 2 or reduce_batch_first:
-        inter = torch.dot(input.reshape(-1), target.reshape(-1))
-        sets_sum = torch.sum(input) + torch.sum(target)
-        if sets_sum.item() == 0:
-            sets_sum = 2 * inter
+	if input.dim() == 2 or reduce_batch_first:
+		inter = torch.dot(input.reshape(-1), target.reshape(-1))
+		sets_sum = torch.sum(input) + torch.sum(target)
+		if sets_sum.item() == 0:
+			sets_sum = 2 * inter
 
-        return (2 * inter + epsilon) / (sets_sum + epsilon)
-    else:
-        # compute and average metric for each batch element
-        dice = 0
-        for i in range(input.shape[0]):
-            dice += dice_coeff(input[i, ...], target[i, ...])
-        return dice / input.shape[0]
+		return (2 * inter + epsilon) / (sets_sum + epsilon)
+	else:
+		# compute and average metric for each batch element
+		dice = 0
+		for i in range(input.shape[0]):
+			dice += dice_coeff(input[i, ...], target[i, ...])
+		return dice / input.shape[0]
 
 
 def multiclass_dice_coeff(input: Tensor, target: Tensor, reduce_batch_first: bool = False, epsilon=1e-6):
-    # Average of Dice coefficient for all classes
-    assert input.size() == target.size()
-    dice = 0
-    for channel in range(input.shape[1]):
-        dice += dice_coeff(input[:, channel, ...], target[:,
-                           channel, ...], reduce_batch_first, epsilon)
+	# Average of Dice coefficient for all classes
+	assert input.size() == target.size()
+	dice = 0
+	for channel in range(input.shape[1]):
+		dice += dice_coeff(input[:, channel, ...], target[:,
+						   channel, ...], reduce_batch_first, epsilon)
 
-    return dice / input.shape[1]
+	return dice / input.shape[1]
 
 
 def dice_loss(input: Tensor, target: Tensor, multiclass: bool = False):
-    # Dice loss (objective to minimize) between 0 and 1
-    assert input.size() == target.size()
-    fn = multiclass_dice_coeff if multiclass else dice_coeff
-    return 1 - fn(input, target, reduce_batch_first=True)
+	# Dice loss (objective to minimize) between 0 and 1
+	assert input.size() == target.size()
+	fn = multiclass_dice_coeff if multiclass else dice_coeff
+	return 1 - fn(input, target, reduce_batch_first=True)
+
+class TripletLoss(nn.Module):
+	def __init__(self, margin=0):
+		super(TripletLoss, self).__init__()
+		self.margin = margin
+		self.ranking_loss = nn.MarginRankingLoss(margin=margin)
+
+	def forward(self, inputs, targets):
+		n = inputs.size(0)
+		# Compute pairwise distance, replace by the official when merged
+		dist = torch.pow(inputs, 4).sum(dim=1, keepdim=True).expand(n, n)
+		dist = dist + dist.t()
+		dist.addmm_(1, -2, inputs, inputs.t())
+		dist = dist.clamp(min=1e-12).sqrt()  # for numerical stability
+		# For each anchor, find the hardest positive and negative
+		mask = targets.expand(n, n).eq(targets.expand(n, n).t())
+		dist_ap, dist_an = [], []
+		for i in range(n):
+			dist_ap.append(dist[i][mask[i]].max())
+			dist_an.append(dist[i][mask[i] == 0].min())
+		dist_ap = torch.cat(dist_ap)
+		dist_an = torch.cat(dist_an)
+		# Compute ranking hinge loss
+		y = dist_an.data.new()
+		y.resize_as_(dist_an.data)
+		y.fill_(1)
+		y = Variable(y)
+		loss = self.ranking_loss(dist_an, dist_ap, y)
+		prec = (dist_an.data > dist_ap.data).sum() * 1. / y.size(0)
+		dist_p = torch.mean(dist_ap).data[0]
+		dist_n = torch.mean(dist_an).data[0]
+		return loss, prec, dist_p, dist_n,dist_ap, dist_an, dist
 
 def smooth(scalars, weight):  # Weight between 0 and 1
-    last = scalars[0]  # First value in the plot (first timestep)
-    smoothed = list()
-    for point in scalars:
-        smoothed_val = last * weight + \
-            (1 - weight) * point  # Calculate smoothed value
-        smoothed.append(smoothed_val)                        # Save it
-        # Anchor the last smoothed value
-        last = smoothed_val
+	last = scalars[0]  # First value in the plot (first timestep)
+	smoothed = list()
+	for point in scalars:
+		smoothed_val = last * weight + \
+			(1 - weight) * point  # Calculate smoothed value
+		smoothed.append(smoothed_val)						# Save it
+		# Anchor the last smoothed value
+		last = smoothed_val
 
-    return smoothed
+	return smoothed
 
 
 # My utils
@@ -313,7 +345,7 @@ def train_distilled(model, optimizer, train_loader, other_model=None):
 
 
 # Train each distilled model layer on the error of each later of the teacher model
-def train_layer_wise_distillation(student_model, optimizer, train_loader, teacher_model=None):
+def train_feature_embedding(student_model, optimizer, train_loader, teacher_model=None):
 	T = 1  # temperature for distillation loss
 	# Using a higher value for T produces a softer probability distribution over classes
 	alpha = 0.95
@@ -322,52 +354,73 @@ def train_layer_wise_distillation(student_model, optimizer, train_loader, teache
 
 	teacher_model.eval().cuda()
 	student_model.train().cuda()
-	dl = []
+	running_loss = 0
 
-	teacher_num_layers = len(list(teacher_model.children()))
-	student_num_layers = len(list(student_model.children()))
-	assert(teacher_num_layers == student_num_layers)
+	"""
+	features_train = []
+	labels_train = []
+	for i, (inputs, labels) in enumerate(train_loader):
+		if torch.cuda.is_available():
+			inputs, labels = inputs.cuda(), labels.cuda()
+		features = teacher_model(inputs)
+		features_train.append(features.detach())
+		labels_train.append(labels)
+	
+	features_train = torch.cat(features_train, dim=0)
+	labels_train = torch.cat(labels_train, dim=0)
 
-	total = len(train_loader)*train_loader.batch_size*teacher_num_layers
+	with tqdm(total=len(train_loader), desc=f'Training', unit='img') as pbar:
+		for i, (inputs, labels) in enumerate(zip(features_train, labels_train), 0):
+			if torch.cuda.is_available():
+				inputs, labels = inputs.cuda(), labels.cuda()
+			optimizer.zero_grad()
+			outputs = student_model(inputs)
+			loss = dice_loss(outputs, labels)
+			loss.backward()
+			optimizer.step()
+			running_loss += loss.item()
+			
+			pbar.update(1)
+			pbar.set_postfix(**{'loss': loss.item(), "dice": running_loss/(i+1)})
 
-	total = len(train_loader)*train_loader.batch_size*len(list(teacher_model.children()))
-	with tqdm(total=total, desc=f'Training', unit='img') as pbar:
-		for layer_num, (teacher_layer, student_layer) in enumerate(zip(teacher_model.children(), student_model.children())):
-			# Get the output of the layer for the teacher network
-			teacher_layer = nn.Sequential(teacher_layer)
-			total_loss = 0.0
-			for i, (img, gt) in enumerate(train_loader):
-				optimizer.zero_grad()
-				#print('i', i)
-				if torch.cuda.is_available():
-					img, gt = img.cuda(), gt.cuda()
-				
-				img, gt = Variable(img), Variable(gt)
+	
+	"""
+	criterion = TripletLoss()
+	
+	with tqdm(total=len(train_loader), desc=f'Training', unit='img') as pbar:
+		for i, (inputs, labels) in enumerate(train_loader):
+			
+			if torch.cuda.is_available():
+				inputs, labels = inputs.cuda(), labels.cuda()
 
-				# Forward pass with teacher network
-				with torch.no_grad():
-					teacher_outputs = teacher_model(img)
-					teacher_layer_outputs = teacher_layer(img)
-				
-				# Forward pass with student network
-				student_outputs = student_model(img)
-				dice = dice_coeff(student_outputs, gt)
-				dl.append(dice.item())
-				student_layer = nn.Sequential(*list(student_model.children())[:layer_num+1])
-				student_layer_outputs = student_layer(img)
+			optimizer.zero_grad()
 
-				distillation_loss = dice_loss(student_layer_outputs, teacher_layer_outputs)
-				#loss = dice_loss(F.softmax(student_outputs/T, dim=1), F.softmax(teacher_outputs/T, dim=1)) * (T * T) * alpha + dice_loss(student_layer_outputs, teacher_outputs) * (1. - alpha)
-				loss = distillation_loss
-				# Backward pass and optimization
-				loss.backward()
-				optimizer.step()
+			embed_feat = student_model(inputs)
+			embed_feat_t = teacher_model(inputs)
+			# Implement criterion
 
-				pbar.update(len(img))
-				pbar.set_postfix(**{'loss': loss.item(), "dice": np.mean(dl)})
+			loss_net, inter_, dist_ap, dist_an, dis_pos, dis_neg, dis = criterion(embed_feat, labels)
+			loss_net_t, inter_t, dist_ap_t, dist_an_t ,dis_pos_t, dis_neg_t ,dis_t = criterion(embed_feat_t, labels)
+			
+			lamda = 0.5
+			if True: #relative
+				loss_distillation = 0.0*torch.mean(F.pairwise_distance(embed_feat,embed_feat_t))
+				loss_distillation += torch.mean(torch.norm(dis-dis_t,p=2))
+				loss = loss_net + lamda * loss_distillation
+			
+			else: #absolute
+				loss_distillation = torch.mean(F.pairwise_distance(embed_feat,embed_feat_t))
+				loss = loss_net + lamda * loss_distillation
+			
 
-	mean_dice = np.mean(dl)
+			loss.backward()
+			optimizer.step()
+			running_loss += loss.item()
 
+			pbar.update(1)
+			pbar.set_postfix(**{'loss': loss.item(), "dice": running_loss/(i+1)})
+
+	mean_dice = running_loss/len(train_loader)
 	return mean_dice
 
 def model_training(model, train_loader, val_loader, trainFun, evalFun, n_epochs, name="", other_model=None):
