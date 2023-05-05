@@ -119,38 +119,6 @@ def dice_loss(input: Tensor, target: Tensor, multiclass: bool = False):
 	fn = multiclass_dice_coeff if multiclass else dice_coeff
 	return 1 - fn(input, target, reduce_batch_first=True)
 
-class TripletLoss(nn.Module):
-	def __init__(self, margin=0):
-		super(TripletLoss, self).__init__()
-		self.margin = margin
-		self.ranking_loss = nn.MarginRankingLoss(margin=margin)
-
-	def forward(self, inputs, targets):
-		n = inputs.size(0)
-		# Compute pairwise distance, replace by the official when merged
-		dist = torch.pow(inputs, 4).sum(dim=1, keepdim=True).expand(n, n)
-		dist = dist + dist.t()
-		dist.addmm_(1, -2, inputs, inputs.t())
-		dist = dist.clamp(min=1e-12).sqrt()  # for numerical stability
-		# For each anchor, find the hardest positive and negative
-		mask = targets.expand(n, n).eq(targets.expand(n, n).t())
-		dist_ap, dist_an = [], []
-		for i in range(n):
-			dist_ap.append(dist[i][mask[i]].max())
-			dist_an.append(dist[i][mask[i] == 0].min())
-		dist_ap = torch.cat(dist_ap)
-		dist_an = torch.cat(dist_an)
-		# Compute ranking hinge loss
-		y = dist_an.data.new()
-		y.resize_as_(dist_an.data)
-		y.fill_(1)
-		y = Variable(y)
-		loss = self.ranking_loss(dist_an, dist_ap, y)
-		prec = (dist_an.data > dist_ap.data).sum() * 1. / y.size(0)
-		dist_p = torch.mean(dist_ap).data[0]
-		dist_n = torch.mean(dist_an).data[0]
-		return loss, prec, dist_p, dist_n,dist_ap, dist_an, dist
-
 def smooth(scalars, weight):  # Weight between 0 and 1
 	last = scalars[0]  # First value in the plot (first timestep)
 	smoothed = list()
@@ -343,6 +311,37 @@ def train_distilled(model, optimizer, train_loader, other_model=None):
 
 	return mean_dice
 
+import math
+
+# From https://github.com/udemirezen/continual-learning-benchmark/blob/958fe2645e4c3f8b56b03ce5cc7c6f5d35874a71/train/customized_distill_trainer.py#L202
+def get_locality_preserving_alpha(teacher_features, i, j, k=5):
+        sigma = math.sqrt(2) # normalizing constant
+        f_T_i = teacher_features[i]
+        dist = torch.norm(teacher_features - f_T_i, dim=1, p=None)
+        knn_indices = dist.topk(k+1, largest=False).indices[1:] # 0th index is always the element itself
+        if j in knn_indices:
+            alpha_i_j = - dist[j].float().pow(2) / sigma ** 2
+            alpha_i_j = torch.exp(alpha_i_j).item()
+        else:
+            alpha_i_j = 0.
+        return alpha_i_j
+
+def locality_preserving_loss(student_features, teacher_features, labels, k=5, lambda_lpl=0.2):
+    # locality preserving loss
+	k, gamma = 5 if len(labels) > 5 else math.ceil(len(labels) / 2), 1.5
+	lpl_loss = 0
+	for i, data in enumerate(student_features):
+		f_s_i = data
+		for j, data_ in enumerate(student_features):
+			if j != i:
+				alpha_i_j = get_locality_preserving_alpha(teacher_features, i, j, k)
+				if alpha_i_j > 0:
+					temp_ = torch.norm(f_s_i - data_, dim=0, p=None).pow(2)
+					lpl_loss += temp_.item() * alpha_i_j
+	
+	lpl_loss = gamma * lpl_loss / (labels.shape[0] * k)  # scale by factor: gamma / (k * batch_size)
+	loss += lpl_loss
+	loss_stats += f" LPL loss: {lpl_loss}"
 
 # Train each distilled model layer on the error of each later of the teacher model
 def train_feature_embedding(student_model, optimizer, train_loader, teacher_model=None):
@@ -384,9 +383,7 @@ def train_feature_embedding(student_model, optimizer, train_loader, teacher_mode
 			pbar.set_postfix(**{'loss': loss.item(), "dice": running_loss/(i+1)})
 
 	
-	"""
-	criterion = TripletLoss()
-	
+	"""	
 	with tqdm(total=len(train_loader), desc=f'Training', unit='img') as pbar:
 		for i, (inputs, labels) in enumerate(train_loader):
 			
@@ -395,22 +392,16 @@ def train_feature_embedding(student_model, optimizer, train_loader, teacher_mode
 
 			optimizer.zero_grad()
 
-			embed_feat = student_model(inputs)
-			embed_feat_t = teacher_model(inputs)
+			feat = student_model(inputs)
+			feat_t = teacher_model(inputs)
 			# Implement criterion
 
-			loss_net, inter_, dist_ap, dist_an, dis_pos, dis_neg, dis = criterion(embed_feat, labels)
-			loss_net_t, inter_t, dist_ap_t, dist_an_t ,dis_pos_t, dis_neg_t ,dis_t = criterion(embed_feat_t, labels)
+			#loss, = dice_loss(feat, labels)
+			#loss_t = dice_loss(feat_t, labels)
 			
-			lamda = 0.5
-			if True: #relative
-				loss_distillation = 0.0*torch.mean(F.pairwise_distance(embed_feat,embed_feat_t))
-				loss_distillation += torch.mean(torch.norm(dis-dis_t,p=2))
-				loss = loss_net + lamda * loss_distillation
+
+			loss = locality_preserving_loss(feat, feat_t, labels, k=5, lambda_lpl=0.2)
 			
-			else: #absolute
-				loss_distillation = torch.mean(F.pairwise_distance(embed_feat,embed_feat_t))
-				loss = loss_net + lamda * loss_distillation
 			
 
 			loss.backward()
