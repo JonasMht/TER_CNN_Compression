@@ -132,6 +132,45 @@ def smooth(scalars, weight):  # Weight between 0 and 1
 	return smoothed
 
 
+def kd_loss(output, soft_targets, gt, alpha = 0.5, T = 1):
+	# Compute soft targets using the teacher model
+	with torch.no_grad():
+		soft_targets = F.softmax(soft_targets/T, dim=1)
+	
+	loss = dice_loss(output, gt)
+	distill_loss = dice_loss(F.softmax(output/T, dim=1), soft_targets) * (T * T) * alpha + loss * (1. - alpha)
+	return distill_loss
+
+# Alternative approach
+def kd_loss2(output, soft_targets, gt, alpha=0.9, T=5):
+    """
+    Compute the knowledge distillation loss.
+
+    Arguments:
+    - output: Output logits from the student network (torch.Tensor)
+    - soft_targets: Soft targets (probabilities) from the teacher network (torch.Tensor)
+    - gt: Ground truth labels (torch.Tensor)
+    - alpha: Weighting factor for the soft target loss (float, default=0.5)
+    - T: Temperature parameter for softmax (float, default=1)
+
+    Returns:
+    - kd_loss: Knowledge distillation loss (torch.Tensor)
+    """
+    # Compute the cross-entropy loss between the output and ground truth
+    ce_loss = F.cross_entropy(output, gt)
+
+    # Apply softmax with temperature T to the output and soft targets
+    output_soft = F.softmax(output / T, dim=1)
+    soft_targets_soft = F.softmax(soft_targets / T, dim=1)
+
+    # Compute the Kullback-Leibler (KL) divergence loss between the output and soft targets
+    kl_loss = F.kl_div(output_soft.log(), soft_targets_soft, reduction='batchmean')
+
+    # Compute the overall knowledge distillation loss
+    kd_loss = (1 - alpha) * ce_loss + alpha * T * T * kl_loss
+
+    return kd_loss
+
 # My utils
 
 def load_model(model, device, path=""):
@@ -214,13 +253,10 @@ def evaluate(model, val_loader):
 			output = model(img)
 			output = output.clamp(min = 0, max = 1)
 			gt = gt.clamp(min = 0, max = 1)
-			loss = dice_loss(output, gt)
-			dice = dice_coeff(output, gt)
-			dl.append(dice.item())
-
+			dice_loss = dice_coeff(output, gt)
+			dl.append(dice_loss.item())
 	
 	mean_dice = np.mean(dl)
-	print("Eval metrics : dice {:.3f}.".format(mean_dice))
 	return mean_dice
 
 
@@ -228,18 +264,18 @@ def train(model, optimizer, train_loader, other_model=None):
 	model.train().cuda()
 	dl = []
 	with tqdm(total=len(train_loader)*train_loader.batch_size, desc=f'Training', unit='img') as pbar:
-		for i, (img, gt) in enumerate(train_loader):
+		for i, (inputs, labels) in enumerate(train_loader):
 			#print('i', i)
 			if torch.cuda.is_available():
-				img, gt = img.cuda(), gt.cuda()
+				inputs, labels = inputs.cuda(), labels.cuda()
 			
-			img, gt = Variable(img), Variable(gt)
+			inputs, labels = Variable(inputs), Variable(labels)
 
-			output = model(img)
+			output = model(inputs)
 			output = output.clamp(min = 0, max = 1)
-			gt = gt.clamp(min = 0, max = 1)
-			loss = dice_loss(output, gt)
-			dice = dice_coeff(output, gt)
+			labels = labels.clamp(min = 0, max = 1)
+			loss = dice_loss(output, labels)
+			dice = dice_coeff(output, labels)
 			dl.append(dice.item())
 
 			
@@ -248,7 +284,7 @@ def train(model, optimizer, train_loader, other_model=None):
 
 			optimizer.step()
 
-			pbar.update(len(img))
+			pbar.update(len(inputs))
 			pbar.set_postfix(**{'loss': loss.item(), "dice": dice.item()})
 	
 	mean_dice = np.mean(dl)
@@ -260,9 +296,9 @@ def train(model, optimizer, train_loader, other_model=None):
 
 # Training function where the teacher model is used to generate soft targets in the case of image segmentation
 def train_distilled(model, optimizer, train_loader, other_model=None):
-	T = 1  # temperature for distillation loss
+	T = 5  # temperature for distillation loss
 	# Using a higher value for T produces a softer probability distribution over classes
-	alpha = 0.95
+	alpha = 0.9
 	# trade-off between soft-target (st) cross-entropy and true-target (tt) cross-entropy;
 	# loss = alpha * st + (1 - alpha) * tt
 
@@ -278,24 +314,22 @@ def train_distilled(model, optimizer, train_loader, other_model=None):
 			
 			img, gt = Variable(img), Variable(gt)
 
-			output = model(img)
-			output = output.clamp(min = 0, max = 1)
+			# Work on this to transfer all code into the kd_loss function++++++++++++-
+
+			student_output = model(img)
+			student_output = student_output.clamp(min = 0, max = 1)
+
+			teacher_output = teacher_model(img)
+			teacher_output = teacher_output.clamp(min = 0, max = 1)
+
 			gt = gt.clamp(min = 0, max = 1)
-			loss = dice_loss(output, gt)
-			dice = dice_coeff(output, gt)
+
+			dice = dice_coeff(student_output, gt)
 			dl.append(dice.item())
 
-			# Compute soft targets using the teacher model
-			with torch.no_grad():
-				soft_targets = teacher_model(img)
-				soft_targets = soft_targets.clamp(min = 0, max = 1)
-				soft_targets = F.softmax(soft_targets/T, dim=1)
-
-			# Compute the true targets
-			true_targets = gt
 
 			# Compute the distillation loss
-			distillation_loss = dice_loss(F.softmax(output/T, dim=1), soft_targets) * (T * T) * alpha + loss * (1. - alpha)
+			distillation_loss = kd_loss(student_output, teacher_output, gt, alpha, T)
 
 			optimizer.zero_grad()
 			distillation_loss.backward()
@@ -414,7 +448,7 @@ def train_feature_embedding(student_model, optimizer, train_loader, teacher_mode
 	mean_dice = running_loss/len(train_loader)
 	return mean_dice
 
-def model_training(model, train_loader, val_loader, trainFun, evalFun, n_epochs, name="", other_model=None):
+def model_training(model, train_loader, val_loader, trainFun, evalFun, n_epochs, name="", other_model=None, early_stopping=10):
 	optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 	scheduler = StepLR(optimizer, step_size = 100, gamma = 0.2)
 
@@ -425,7 +459,10 @@ def model_training(model, train_loader, val_loader, trainFun, evalFun, n_epochs,
 	best_model = model
 
 	for epoch in range(n_epochs):
+		if epoch % 10 == 9:
+			scheduled_saves += 1
 		print(" --- training: epoch {}".format(epoch+1))
+		
 		# Train the model
 		train_dice = trainFun(model, optimizer, train_loader, other_model)
 
@@ -434,16 +471,21 @@ def model_training(model, train_loader, val_loader, trainFun, evalFun, n_epochs,
 
 		#evaluate for one epoch on validation set
 		valid_dice = evalFun(model, val_loader)
+		print("Eval metrics : dice {:.3f}.".format(valid_dice))
+
 		
 
 		if former_best_dice < valid_dice:
 			# dice is increasing
 			early_stopping_streak = 0
 			best_model = copy.deepcopy(model)
+			if scheduled_saves and name != "":
+				scheduled_saves = 0
+				torch.save(model.state_dict(), "{}_epoch_{}.pth".format(name, epoch+1))
 		else:
 			# Is decresing
 			early_stopping_streak += 1
-			if early_stopping_streak >= 20:
+			if early_stopping_streak >= early_stopping:
 				# 15 consecutive epochs without improvement in dice
 				print("Early stopping at epoch {}".format(epoch+1))
 				break

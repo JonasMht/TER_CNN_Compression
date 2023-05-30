@@ -24,6 +24,10 @@ from torch import Tensor
 import pickle
 from datetime import datetime
 
+# Importation des modules de torchdistill
+import torchdistill
+
+
 import copy # To make a copy of a model
 
 
@@ -42,7 +46,7 @@ import csv
 
 
 # Set random seed for reproducibility
-manualSeed = 999
+manualSeed = 0
 # manualSeed = random.randint(1, 10000) # use if you want new results
 print("Random Seed: ", manualSeed)
 random.seed(manualSeed)
@@ -66,7 +70,7 @@ python3.6 -m pip install torchvision
 """
 
 # Glbal teacher model
-n_epochs = 150
+n_epochs = 250
 n_models = 20
 n_iter = 10
 
@@ -82,14 +86,20 @@ heure = str(datetime.now()).split(' ')[1].split('.')[0]
 session_name = ""
 
 if len(session_name) == 0:
-	session_name = "IGBMC_I3"+"_"+str(date)+"_"+str(heure)
+	session_name = "final_data_collection_2"#"IGBMC_I3"+"_"+str(date)+"_"+str(heure)
 
 
-dataset_folder = "/home/mehtali/TER_CNN_Compression/Data/training-data/data/IGBMC_I3_diversifie/patches/"
+dataset_folder_i3 = "/home/mehtali/TER_CNN_Compression/Data/training-data/data/IGBMC_I3_diversifie/patches/"
 
-train_list = dataset_folder+"train_4000_i3.txt"
-teacher_train_list = dataset_folder+"train_10000_i3.txt"
-validate_list = dataset_folder+"test_1000.txt"
+train_list_i3 = dataset_folder_i3+"train_10000_i3.txt"
+teacher_train_list_i3 = dataset_folder_i3+"train_10000_i3.txt"
+validate_list_i3 = dataset_folder_i3+"test_1000.txt"
+
+# TODO
+dataset_folder_lw4 = "/home/mehtali/TER_CNN_Compression/Data/training-data/data/IGBMC_LW4_diversifie/patches/"
+train_list_lw4 = dataset_folder_lw4+"train_10000_lw4.txt"
+teacher_train_list_lw4 = dataset_folder_lw4+"train_10000_lw4.txt"
+validate_list_lw4 = dataset_folder_lw4+"test_5000-7500_lw4.txt"
 
 # For debug
 """
@@ -136,7 +146,7 @@ if not os.path.exists(save_path):
 
 log_file = open(log_path+"log.txt", "w")
 
-log_file.write("dataset_folder :"+dataset_folder+"\n")
+log_file.write("dataset_folder :"+dataset_folder_i3+"\n")
 log_file.write("batch_size="+str(batch_size)+"\n")
 log_file.write("num_max_epoch="+str(n_epochs)+"\n")
 log_file.write("nc="+str(nc)+"\n")
@@ -180,44 +190,70 @@ tfs = transforms.Compose(geometric_augs)
 
 
 # Importation des images et masques de i3
-train_dataset = SegmentationDataSet(root=dataset_folder,
-							  list_path=train_list,
+train_dataset_i3 = SegmentationDataSet(root=dataset_folder_i3,
+							  list_path=train_list_i3,
 							  transform_img=make_tfs(
 								  geometric_augs + color_augs),
 							  transform_label=make_tfs(geometric_augs)
 							  )
 
-teacher_train_dataset = SegmentationDataSet(root=dataset_folder,
-							  list_path=teacher_train_list,
+teacher_train_dataset_i3 = SegmentationDataSet(root=dataset_folder_i3,
+							  list_path=teacher_train_list_i3,
 							  transform_img=make_tfs(
 								  geometric_augs + color_augs),
 							  transform_label=make_tfs(geometric_augs)
 							  )
 
 # Not a good idea to augment the test data
-validate_dataset = SegmentationDataSet(root=dataset_folder,
-								list_path=validate_list
+validate_dataset_i3 = SegmentationDataSet(root=dataset_folder_i3,
+								list_path=validate_list_i3
 								)
 
+validate_dataset_lw4 = SegmentationDataSet(root=dataset_folder_lw4,
+								list_path=validate_list_lw4
+								)
+
+train_dataset_lw4 = SegmentationDataSet(root=dataset_folder_lw4,
+							  list_path=train_list_lw4
+							  )
+
+teacher_train_dataset_lw4 = SegmentationDataSet(root=dataset_folder_lw4,
+							  list_path=teacher_train_list_lw4
+							  )
 
 
-train_dataloader = torch.utils.data.DataLoader(train_dataset,
+train_dataloader_i3 = torch.utils.data.DataLoader(train_dataset_i3,
 											   batch_size=batch_size,
 											   shuffle=True,
 											   num_workers=workers)
 
-teacher_train_dataloader= torch.utils.data.DataLoader(teacher_train_dataset,
+teacher_train_dataloader_i3= torch.utils.data.DataLoader(teacher_train_dataset_i3,
 											   batch_size=batch_size,
 											   shuffle=True,
 											   num_workers=workers)
 
-validation_dataloader = torch.utils.data.DataLoader(validate_dataset,
+validation_dataloader_i3 = torch.utils.data.DataLoader(validate_dataset_i3,
 											  batch_size=batch_size,
 											  shuffle=True,
 											  num_workers=workers)
 
 
-batch = next(iter(train_dataloader))
+train_dataloader_lw4 = torch.utils.data.DataLoader(train_dataset_lw4,
+						   						batch_size=batch_size,
+												shuffle=True,
+												num_workers=workers)	
+
+teacher_train_dataloader_lw4 = torch.utils.data.DataLoader(teacher_train_dataset_lw4,
+							   					batch_size=batch_size,
+												shuffle=True,
+												num_workers=workers)	
+
+validation_dataloader_lw4 = torch.utils.data.DataLoader(validate_dataset_lw4,
+											  batch_size=batch_size,
+											  shuffle=True,
+											  num_workers=workers)
+
+batch = next(iter(train_dataloader_i3))
 
 # On affiche quelques exemple du batch pour vérifier qu'on a bien importé les données
 print("images source : ", batch[0].shape)
@@ -233,33 +269,39 @@ log_file = open(log_path+"teacher_model_performance.txt", "w")
 log_file.write("Best Dice\tModel Name\n")
 log_file.flush()
 
-teacher_model_path = "/home/mehtali/TER_CNN_Compression/Distilling/teacher_model_param_3352257.pth"
+teacher_model_path = "/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/teacher_model_depth_128/teacher_model_param_53553921.pth"#"/home/mehtali/TER_CNN_Compression/Distilling/teacher_model_param_3352257.pth"
 # Teacher model
-teacher_model = load_model(UNet_modular(channel_depth=32, n_channels=3, n_classes=1), device, teacher_model_path)
+teacher_model = load_model(UNet_modular(channel_depth=128, n_channels=3, n_classes=1), device, teacher_model_path)
 
 
-if teacher_model_path == "":
+
+# Train a teacher model if none is given
+if False:
 	model_descr = "teacher_model_param_{}".format(get_trainable_param(teacher_model))
 	# Train teacher Model
-	teacher_model, best_dice = model_training(teacher_model, teacher_train_dataloader, validation_dataloader, train, evaluate, n_epochs)
 	teacher_model_path = model_path+"teacher/"
 	if not os.path.exists(teacher_model_path):
 		os.mkdir(teacher_model_path)
+	
+	teacher_model, best_dice = model_training(teacher_model, teacher_train_dataloader_i3, validation_dataloader_i3,
+					   train, evaluate, n_epochs,teacher_model_path+"teacher_model")
+	
+	
 	save_model(teacher_model, teacher_model_path+model_descr+".pth")
+
 	log_file.write("Dice : {:.3f}\tModel : {}\n".format(best_dice, model_descr))
 	log_file.flush()
 
 log_file.close()
+
 
 # Distilled model
 log_file = open(log_path+"distilled_model_performance.txt", "a")
 
 # Train distilled models
 if True:
-	for i in range(1, n_models+1):
-		d_model_path = model_path+"d_model_"+str(i)+"/"
-		
-		
+	for depth in [3]:
+		d_model_path = model_path+"d_model_depth_"+str(depth)+"/"
 		
 		if not os.path.exists(d_model_path):
 			os.mkdir(d_model_path)
@@ -269,28 +311,26 @@ if True:
 			if not os.path.exists(d_model_iter_folder):
 				os.mkdir(d_model_iter_folder)
 
-			# Train 10 models per depth modification
-
 			# Distilled model
-			model = load_model(UNet_modular(channel_depth=2*i, n_channels=3, n_classes=1), device)
-			model_descr = "d_model_{}_iteration_{}_param_{}".format(i, j, get_trainable_param(model))
-			nd_model, best_dice = model_training(model, train_dataloader, validation_dataloader, train_feature_embedding, evaluate, n_epochs, other_model=teacher_model)
-			save_model(model, d_model_iter_folder+model_descr+".pth")
+			model = load_model(UNet_modular(channel_depth=depth, n_channels=3, n_classes=1), device)
+			model_descr = "d_model_depth_{}_iteration_{}_param_{}".format(depth, j, get_trainable_param(model))
+			nd_model, best_dice = model_training(model, train_dataloader_i3, validation_dataloader_i3, train_distilled, evaluate, n_epochs, other_model=teacher_model, early_stopping=20)
+			save_model(nd_model, d_model_iter_folder+model_descr+".pth")
+			# Free model:
+			del model
+			del nd_model
 			log_file.write("Dice : {:.3f}\tModel : {}\n".format(best_dice, model_descr))
 			log_file.flush()
 
-
-			
-
-log_file.colse()
+log_file.close()
 
 
 log_file = open(log_path+"not_distilled_model_performance.txt", "a")
 
 # Train non distilled models
-if False:
-	for i in range(1, n_models+1):
-		nd_model_path = model_path+"nd_model_"+str(i)+"/"
+if True:
+	for depth in [3]:
+		nd_model_path = model_path+"nd_model_depth_"+str(depth)+"/"
 		if not os.path.exists(nd_model_path):
 			os.mkdir(nd_model_path)
 		
@@ -302,12 +342,16 @@ if False:
 			# Train 10 models per depth modification
 
 			# Not Distilled model
-			model = load_model(UNet_modular(channel_depth=2*i, n_channels=3, n_classes=1), device)
-			model_descr = "nd_model_{}_iteration_{}_param_{}".format(i, j, get_trainable_param(model))
-			d_model, best_dice = model_training(model, train_dataloader, validation_dataloader, train, evaluate, n_epochs)
-			save_model(model, nd_model_iter_folder+model_descr+".pth")
+			model = load_model(UNet_modular(channel_depth=depth, n_channels=3, n_classes=1), device)
+			model_descr = "nd_model_depth_{}_iteration_{}_param_{}".format(depth, j, get_trainable_param(model))
+			d_model, best_dice = model_training(model, train_dataloader_i3, validation_dataloader_i3, train, evaluate, n_epochs, early_stopping=20)
+			save_model(d_model, nd_model_iter_folder+model_descr+".pth")
+			# Free model:
+			del model
+			del d_model
 			log_file.write("Dice : {:.3f}\tModel : {}\n".format(best_dice, model_descr))
 			log_file.flush()
 	
 
 log_file.close()
+

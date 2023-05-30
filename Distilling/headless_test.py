@@ -73,8 +73,7 @@ python3.6 -m pip install torchvision
 # au format demandé par le dataloader
 
 # Leave empty if you want to use the default name or load a previous session
-session_name = "IGBMC_I3_2023-04-01_12:48:16"
-
+session_name = "final_data_collection"
 
 dataset_folder = "/home/mehtali/TER_CNN_Compression/Data/training-data/data/IGBMC_I3_diversifie/patches/"
 
@@ -202,6 +201,38 @@ def load_models(folder, pattern):
 		i+=1
 		
 	return models
+		
+
+
+# Load data
+dataset_folder_i3 = "/home/mehtali/TER_CNN_Compression/Data/training-data/data/IGBMC_I3_diversifie/patches/"
+validate_list_i3 = dataset_folder_i3+"test_1000.txt"
+
+# TODO
+dataset_folder_lw4 = "/home/mehtali/TER_CNN_Compression/Data/training-data/data/IGBMC_LW4_diversifie/patches/"
+validate_list_lw4 = dataset_folder_lw4+"test_5000-7500_lw4.txt"
+
+
+validate_dataset_i3 = SegmentationDataSet(root=dataset_folder_i3,
+								list_path=validate_list_i3
+								)
+
+validate_dataset_lw4 = SegmentationDataSet(root=dataset_folder_lw4,
+								list_path=validate_list_lw4
+								)
+
+
+validation_dataloader_i3 = torch.utils.data.DataLoader(validate_dataset_i3,
+											  batch_size=batch_size,
+											  shuffle=True,
+											  num_workers=workers)
+
+validation_dataloader_lw4 = torch.utils.data.DataLoader(validate_dataset_lw4,
+											  batch_size=batch_size,
+											  shuffle=True,
+											  num_workers=workers)
+
+
 
 """
 # Example
@@ -210,44 +241,217 @@ print(teacher_path)
 teacher_model = load_model(UNet_modular(channel_depth=32, n_channels=3, n_classes=1), device, teacher_path)
 """
 
-nd_models = load_models(model_path, "/nd_model")
+if False:
+	# Draw the input ground trouth and the output of all the models in one line
+	# Load the models
+	teacher_model_path = "/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/teacher_model_depth_128/teacher_model_param_53553921.pth"
+	teacher_model = load_model(UNet_modular(channel_depth=128, n_channels=3, n_classes=1), device, teacher_model_path)
 
-d_models = load_models(model_path, "/d_model")
+	d_model_path = "/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/d_model_depth_3/iter_2/d_model_depth_3_iteration_2_param_30046.pth"
+	nd_mode_path = "/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/nd_model_depth_3/iter_3/nd_model_depth_3_iteration_3_param_30046.pth"
+
+	d_model = load_model(UNet_modular(channel_depth=3, n_channels=3, n_classes=1), device, d_model_path)
+	nd_model = load_model(UNet_modular(channel_depth=3, n_channels=3, n_classes=1), device, nd_mode_path)
+
+	# Get a batch of images
+	input, target = next(iter(validation_dataloader_i3))
+
+	# Get the output images
+	teacher_output = teacher_model(input)
+	d_output = d_model(input)
+	nd_output = nd_model(input)
+
+	# Clamp the output to 0-1
+	teacher_output = torch.clamp(teacher_output, 0, 1)
+	d_output = torch.clamp(d_output, 0, 1)
+	nd_output = torch.clamp(nd_output, 0, 1)
+
+	# Draw the images on one line having input, ground trouth, teacher output, d output, nd output
+	# Draw the images
+	fig, axs = plt.subplots(1, 5, figsize=(15, 5))
+	axs[0].imshow(input[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[0].set_title("Input")
+	axs[1].imshow(target[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[1].set_title("Ground trouth")
+	axs[2].imshow(teacher_output[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[2].set_title("Teacher CNN output")
+	axs[3].imshow(d_output[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[3].set_title("Distilled CNN output")
+	axs[4].imshow(nd_output[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[4].set_title("Not distilled CNN output")
+	# Save the figure
+	fig.savefig(fig_path+"results_i3.png")
+
+	# On lw4
+	# Get a batch of images
+	input, target = next(iter(validation_dataloader_lw4))
+
+	# Get the output images
+	teacher_output = teacher_model(input)
+	
+	d_output = d_model(input)
+	
+	nd_output = nd_model(input)
+
+	# Clamp the output to 0-1
+	teacher_output = torch.clamp(teacher_output, 0, 1)
+	d_output = torch.clamp(d_output, 0, 1)
+	nd_output = torch.clamp(nd_output, 0, 1)
+
+	# Draw the images on one line having input, ground trouth, teacher output, d output, nd output
+	# Draw the images
+	fig, axs = plt.subplots(1, 5, figsize=(15, 5))
+	axs[0].imshow(input[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[0].set_title("Input")
+	axs[1].imshow(target[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[1].set_title("Ground trouth")
+	axs[2].imshow(teacher_output[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[2].set_title("Teacher CNN output")
+	axs[3].imshow(d_output[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[3].set_title("Distilled CNN output")
+	axs[4].imshow(nd_output[0,0,:,:].cpu().detach().numpy(), cmap='gray')
+	axs[4].set_title("Not distilled CNN output")
+	# Save the figure
+	fig.savefig(fig_path+"results_lw4.png")
 
 
-# Create cvs file to save the evaluation results for each model type and each model variation
 
-# Create the csv file
-csv_file = open(log_path+"evaluation.csv", "w")
-csv_file.write("model_type model_depth model_variation dice_coef\n")
+# The same but plotting an entire batch
+if True:
+	# Draw the input ground trouth and the output of all the models in one line
+	# Load the models
+	teacher_model_path = "/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/teacher_model_depth_128/teacher_model_param_53553921.pth"
+	teacher_model = load_model(UNet_modular(channel_depth=128, n_channels=3, n_classes=1), device, teacher_model_path)
 
-i = 1
-for depth_models in nd_models:
-	j = 1
-	for nd_model_variation in depth_models:
-		dice = evaluate(nd_model_variation, test_dataloader)
-		model_param = get_trainable_param(nd_model_variation)
-		csv_file.write("nd_model "+str(model_param)+" "+str(j)+" "+str(dice).replace('.',',')+"\n")
-		j+=1
-	i+=1
+	d_model_path = "/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/d_model_depth_3/iter_2/d_model_depth_3_iteration_2_param_30046.pth"
+	nd_mode_path = "/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/nd_model_depth_3/iter_3/nd_model_depth_3_iteration_3_param_30046.pth"
 
-i = 1
-for depth_models in d_models:
-	j = 1
-	for d_model_variation in depth_models:
-		dice = evaluate(d_model_variation, test_dataloader)
-		model_param = get_trainable_param(d_model_variation)
-		csv_file.write("d_model, "+str(model_param)+", "+str(j)+", "+str(dice)+"\n")
-		j+=1
-	i+=1
+	d_model = load_model(UNet_modular(channel_depth=3, n_channels=3, n_classes=1), device, d_model_path)
+	nd_model = load_model(UNet_modular(channel_depth=3, n_channels=3, n_classes=1), device, nd_mode_path)
 
-# Close the csv file
-csv_file.close()
+	# Get a batch of images
+	input, target = next(iter(validation_dataloader_i3))
+
+	# Get the output images
+	teacher_output = teacher_model(input)
+	d_output = d_model(input)
+	nd_output = nd_model(input)
+
+	# Clamp the output to 0-1
+	teacher_output = torch.clamp(teacher_output, 0, 1)
+	d_output = torch.clamp(d_output, 0, 1)
+	nd_output = torch.clamp(nd_output, 0, 1)
+
+	# Plot the entire batch with one line per image having input, ground trouth, teacher output, d output, nd output
+	wanted_batch_size = 5
+	fig, axs = plt.subplots(wanted_batch_size, 5, figsize=(15, 25))
+	axs[0,0].set_title("Input")
+	axs[0,1].set_title("Ground trouth")
+	axs[0,2].set_title("Teacher CNN output")
+	axs[0,3].set_title("Distilled CNN output")
+	axs[0,4].set_title("Not distilled CNN output")
+	for i in range(wanted_batch_size):
+		axs[i,0].imshow(input[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+		axs[i,1].imshow(target[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+		axs[i,2].imshow(teacher_output[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+		axs[i,3].imshow(d_output[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+		axs[i,4].imshow(nd_output[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+	
+	# Save the figure
+	fig.savefig(fig_path+"results_i3_batch.png")
+
+	# On lw4
+	# Get a batch of images
+	input, target = next(iter(validation_dataloader_lw4))
+
+	# Get the output images
+	teacher_output = teacher_model(input)
+	d_output = d_model(input)
+	nd_output = nd_model(input)
+	
+	# Clamp the output to 0-1
+	teacher_output = torch.clamp(teacher_output, 0, 1)
+	d_output = torch.clamp(d_output, 0, 1)
+	nd_output = torch.clamp(nd_output, 0, 1)
+
+	# Plot the entire batch with one line per image having input, ground trouth, teacher output, d output, nd output
+	fig, axs = plt.subplots(batch_size, 5, figsize=(15, 25))
+	axs[0,0].set_title("Input")
+	axs[0,1].set_title("Ground trouth")
+	axs[0,2].set_title("Teacher CNN output")
+	axs[0,3].set_title("Distilled CNN output")
+	axs[0,4].set_title("Not distilled CNN output")
+	for i in range(batch_size):
+		axs[i,0].imshow(input[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+		axs[i,1].imshow(target[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+		axs[i,2].imshow(teacher_output[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+		axs[i,3].imshow(d_output[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+		axs[i,4].imshow(nd_output[i,0,:,:].cpu().detach().numpy(), cmap='gray')
+		
+	
+	# Save the figure
+	fig.savefig(fig_path+"results_lw4_batch.png")
 
 
 
-"""
-# Load the teacher model
-teacher_path = model_path +"teacher/"
-teacher_model = load_model(UNet_modular(channel_depth=32, n_channels=3, n_classes=1), device)
-"""
+if False:
+	
+	# Test the models here and save their performance as csv
+	# Data collection
+
+	# Load all the models
+	# Load the teacher model
+
+	teacher_model_path = "/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/teacher_model_depth_128/teacher_model_param_53553921.pth"
+	teacher_model = load_model(UNet_modular(channel_depth=128, n_channels=3, n_classes=1), device, teacher_model_path)
+
+
+
+
+	d_model_paths = [
+		"/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/d_model_depth_3/iter_1/d_model_depth_3_iteration_1_param_30046.pth",
+		"/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/d_model_depth_3/iter_2/d_model_depth_3_iteration_2_param_30046.pth",
+		"/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/d_model_depth_3/iter_3/d_model_depth_3_iteration_3_param_30046.pth",
+	]
+
+	nd_model_paths = [
+		"/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/nd_model_depth_3/iter_1/nd_model_depth_3_iteration_1_param_30046.pth",
+		"/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/nd_model_depth_3/iter_2/nd_model_depth_3_iteration_2_param_30046.pth",
+		"/home/mehtali/TER_CNN_Compression/Data/Saves/final_data_collection/network_weigths/nd_model_depth_3/iter_3/nd_model_depth_3_iteration_3_param_30046.pth",
+	]
+
+
+	# Create csv file
+	csv_file = open(log_path+"test_performance.csv", "w")
+
+	# Write the header
+	csv_file.write("model_name, parameters, training, i3_dice, lw4_dice\n")
+	csv_file.flush()
+
+	# Write the teacher model performance
+	i3_dice = evaluate(teacher_model, validation_dataloader_i3)
+	lw4_dice = evaluate(teacher_model, validation_dataloader_lw4)
+	csv_file.write("teacher_model, {}, {}, {}, {}\n".format(get_trainable_param(teacher_model), "teacher", i3_dice, lw4_dice))
+	csv_file.flush()
+
+	# Write the distilled models performance
+	for i in range(len(d_model_paths)):
+		d_model_path = d_model_paths[i]
+		d_model = load_model(UNet_modular(channel_depth=3, n_channels=3, n_classes=1), device, d_model_path)
+		i3_dice = evaluate(d_model, validation_dataloader_i3)
+		lw4_dice = evaluate(d_model, validation_dataloader_lw4)
+		csv_file.write("d_model_iter_{}, {}, {}, {}, {}\n".format(i+1, get_trainable_param(d_model), "d_model", i3_dice, lw4_dice))
+		csv_file.flush()
+	
+	# Write the non distilled models performance
+	for i in range(len(nd_model_paths)):
+		nd_model_path = nd_model_paths[i]
+		nd_model = load_model(UNet_modular(channel_depth=3, n_channels=3, n_classes=1), device, nd_model_path)
+		i3_dice = evaluate(nd_model, validation_dataloader_i3)
+		lw4_dice = evaluate(nd_model, validation_dataloader_lw4)
+		csv_file.write("nd_model_iter_{}, {}, {}, {}, {}\n".format(i+1, get_trainable_param(nd_model), "nd_model", i3_dice, lw4_dice))
+		csv_file.flush()
+
+	csv_file.close()
+
+
